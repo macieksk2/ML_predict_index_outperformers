@@ -1,0 +1,20 @@
+{
+      "url": "https://www.macrotrends.net/",
+      "tickers_filename": "tickers.csv",
+      "do_macro_scrap": "False",
+      "database": "sp500_20241023_freqQ",
+      "do_sql": "True",
+      "user": "postgres",
+      "password": "passwrod",
+      "host": "localhost",
+      "port": "5432",
+      "YF_START_DATE": "2003-01-01",
+      "YF_END_DATE": "2024-10-31",
+      "train_END_DATE": "2023-09-30",
+      "outperform_idx": 0.1,
+      "RandomForest_no_estimators": 100,
+      "Backtest_initial_capital": 10000,
+      "Backtest_increment": 3000,
+      "Backtest_provision": 0.0025,
+      "Backtest_tax_rate": 0.19
+}
