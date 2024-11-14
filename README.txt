@@ -1,6 +1,13 @@
+PREREQUISITS:
+1. Postgre SQL Tool (e.g. pgadmin)
+2. Anaconda / Spyder with packages listed in requirements.txt
+
+
+SCRIPTS:
+
 I data scrapping.py
 
-1. Scrap macrotrends.com 
+1. Scrap macrotrends.com (Income Statement, Balance Sheet, Cash Flow statement, Key ratios)
 2. Store historicals relevant for fundamental analysis: 
     - Revenue
     - Net Income
@@ -46,4 +53,5 @@ V prediction.py
 
 1. Create first training dataset
 2. Based on model calibration, select stocks in the latest quarters
+
 
