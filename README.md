@@ -2,6 +2,10 @@
 1. Postgre SQL Tool (e.g. pgadmin)
 2. Anaconda / Spyder with packages listed in requirements.txt
 
+# FOLDER STUCTURE
+
+## INPUT
+
 
 # SCRIPTS:
 
