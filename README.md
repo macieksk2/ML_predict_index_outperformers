@@ -1,4 +1,20 @@
-# PREREQUISITS:
+# GENERAL INFORMATION
+The main aim of this project is to create a methodology to determine, based on key financial and technical information, which stocks are likely to outperform the index in the following 12 months.
+The strategy of selecting the subset of model stocks, buying them and selling after 12 months later is backtested against simple investment in the ETF fund in script backtesting.py.
+The main findings of the project:
+1. The model can indeed properly identify stocks that will not beat SP500 (around 90% accuracy) and can properly pick future strong performers in approx 40% of cases
+2. Although the second statistic is not optimal, it is enough to beat SP500 on average between 2010 and 2023 by approx 4-5% per annum
+3. An inclusion of all scrapped variables from macrotrends along with Quarter-on-Quarter and Year-on-Year pct change transformation leads to significantly lower performance than a model with preselected variables (script 2. data processing.py).
+4. There are still a lot of potential improvement points such as: <br />
+   a. Looking for more variables (e.g. EDGAR database, scrapping companies websites, gathering information from customers etc) <br />
+   b. Filling in missing variables - some features like e.g. R&D or acquisition expenses are blank for most SP500 companies in macrotrends. Right now this variable is not considered but with proper amount of information could be a significant driver of future returns / outperformance. <br />
+   c. Definition of predicted variable - perhaps a longer term returns (24 / 36 months) are easier to predict in terms of outperformance rather than 12 months <br />
+   d. Inclusion of economic / political cycles in US (presidential) <br />
+   e. Split of the model into different industries (Tech, Banking, Industrials, Agriculture, Energy, Utilities etc) or into Market Cap (Mega, Large, Mid, Small) <br />
+   f. Extension of search into more US stocks (NASDAQ, Russell) or other geographies (Europe, Asia), where more inefficiencies may be observed <br />
+   g. Change of a model algorithm to a more sophisticated one (e.g. neural networks), especially if more data is available <br />
+
+# PREREQUISITES:
 1. Postgre SQL Tool (e.g. pgadmin)
 2. Anaconda / Spyder with packages listed in requirements.txt
 
@@ -71,7 +87,8 @@ PROCESS:
 5. Scrap historical SP500 prices from Yahoo Finance
 
 ## 2. data processing.py
-! IMPORANT: Current version allows only an import from SQL database (csv option to be added) <br />
+### ! IMPORANT: Current version allows only an import from SQL database (csv option to be added) <br />
+### ! IMPORANT: Features selected for training are hardcoded in the srcipt
 INPUT: SQL database with historical financials, historical stock / index prices, parameters in JSON file <br />
 OUPUT: macrotrends_yf_stockprices_database_full_index.csv, keystats_new.csv, keystats_new_OOS.csv <br />
 PROCESS:
@@ -92,7 +109,7 @@ PROCESS:
 
 ## 4. backtesting.py
 INPUT: parameters in JSON file, keystats_new.csv  <br />
-OUPUT: 
+OUPUT: <br />
 -model performance metrics (confusion matrix, ROC, precision / recall), <br />
 -the most important features,  <br />
 -graphical presentation of the first ten trees,  <br />
