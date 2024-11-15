@@ -88,7 +88,7 @@ PROCESS:
 
 ## 2. data processing.py
 ### ! IMPORANT: Current version allows only an import from SQL database (csv option to be added) <br />
-### ! IMPORANT: Features selected for training are hardcoded in the srcipt
+### ! IMPORANT: Features selected for training are hardcoded in the script
 INPUT: SQL database with historical financials, historical stock / index prices, parameters in JSON file <br />
 OUPUT: macrotrends_yf_stockprices_database_full_index.csv, keystats_new.csv, keystats_new_OOS.csv <br />
 PROCESS:
