@@ -49,7 +49,9 @@ Example of an intermediate output of data scrapping.py script, where the histori
 # SCRIPTS:
 
 ## 1. data scrapping.py
-
+INPUT: a list of tickers to be scrapped, parameters in JSON file <br />
+OUPUT: SQL database / csv file with historical financial information, csv files with stock and index historical prices, plots of main feautres per stock <br />
+PROCESS:
 1. Scrap macrotrends.com (Income Statement, Balance Sheet, Cash Flow statement, Key ratios)
 2. Store historicals relevant for fundamental analysis: 
     - Revenue
@@ -69,7 +71,10 @@ Example of an intermediate output of data scrapping.py script, where the histori
 5. Scrap historical SP500 prices from Yahoo Finance
 
 ## 2. data processing.py
-
+! IMPORANT: Current version allows only an import from SQL database (csv option to be added) <br />
+INPUT: SQL database with historical financials, historical stock / index prices, parameters in JSON file <br />
+OUPUT: macrotrends_yf_stockprices_database_full_index.csv, keystats_new.csv, keystats_new_OOS.csv <br />
+PROCESS:
 1. QoQ, YoYpc transform
 2. Define YoY returns
 3. Create feature variables
@@ -77,14 +82,23 @@ Example of an intermediate output of data scrapping.py script, where the histori
 5. Split in-sample piece of data (with available future 12m return) and out-of-sample part; store in csvs
 
 ## 3. optimal features.py
-
+INPUT: parameters in JSON file, keystats_new.csv <br />
+OUPUT: a dataframe with ROC per run, number of features used in a given run, features used in the run <br />
+PROCESS:
 1. Start with all features selected in script 2.
 2. Fit Random Forest, test on the training set, calculate feature importance
 3. Reduce iteratively the feature set with the least important feature, recalibrate the model, check ROC
 4. Pick the best set of features to be utilized in the following 4. backtesting.py script
 
 ## 4. backtesting.py
-
+INPUT: parameters in JSON file, keystats_new.csv  <br />
+OUPUT: 
+-model performance metrics (confusion matrix, ROC, precision / recall), <br />
+-the most important features,  <br />
+-graphical presentation of the first ten trees,  <br />
+-stocks selected in each quarter,  <br />
+-backtesting results <br />
+PROCESS:
 1. Split train/test sets
 2. Fit RF algorithm based on selected features in prev script
 3. Calculate Accuracy/Precision, confusion matrix, ROC/AUC curve
@@ -92,7 +106,9 @@ Example of an intermediate output of data scrapping.py script, where the histori
 5. Run full backtesting of a portfolio run according to the model vs a simple strategy of buying index ETF
 
 ## 5. prediction.py
-
+INPUT: parameters in JSON file, keystats_new_OOS.csv <br />
+OUPUT: stocks selected in each new quarter  <br />
+PROCESS:  <br />
 1. Create first training dataset
 2. Based on model calibration, select stocks in the latest quarters
 
