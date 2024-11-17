@@ -43,7 +43,7 @@ from utils import status_calc
 # Change from scientific view to float
 pd.set_option('display.float_format', lambda x: '%.3f' % x)
 
-def backtest(shuffle_train_test = True, test_size = 0.2, features_list = []):
+def backtest(shuffle_train_test = True, test_size = 0.2, features_list = [], max_depth_ = None, no_estimators_ = None, min_samples_leaf_ = 1, backtest_type = 'random', min_samples_split_ = 2):
     """
     A simple backtest, which splits the dataset into a train set and test set,
     then fits a Random Forest classifier to the train set. We print the precision and accuracy
@@ -51,6 +51,9 @@ def backtest(shuffle_train_test = True, test_size = 0.2, features_list = []):
     to passive investment in the S&P500.
     Please note that there is a methodological flaw in this backtest which will give deceptively
     good results, so the results here should not encourage you to live trade.
+    
+    backtest_type = ['random', 'sorted'] - if 'random', algorithm shuffles the set and draws random test_size portion to test and rem to train
+    If 'sorted', the observations are split based on the dates - first 1 - test_size go to train, the latest to test set
     """
     from sklearn import tree
     import graphviz
@@ -100,13 +103,26 @@ def backtest(shuffle_train_test = True, test_size = 0.2, features_list = []):
     # Generate the train set and test set by randomly splitting the dataset
     # random state set the same to model init to get reproducible results
     labels = data_df['Quarter'] + "_" + data_df['Ticker']
-    X_train, X_test, y_train, y_test, z_train, z_test, labels_train, labels_test = train_test_split(
-        X, y, z, labels, test_size = test_size, shuffle = shuffle_train_test, random_state=137
-    )
+    if backtest_type == 'random':
+        X_train, X_test, y_train, y_test, z_train, z_test, labels_train, labels_test = train_test_split(
+            X, y, z, labels, test_size = test_size, shuffle = shuffle_train_test, random_state=137
+        )
+    else:
+        train_quarters = np.unique(data_df['Quarter'])[:int((1 - test_size) * len(np.unique(data_df['Quarter'])))].tolist()
+        test_quarters  = np.unique(data_df['Quarter'])[ int((1 - test_size) * len(np.unique(data_df['Quarter']))):].tolist()
+        X_train = data_df[data_df['Quarter'].isin(train_quarters)][features_list].values
+        X_test  = data_df[data_df['Quarter'].isin(test_quarters)][features_list].values
+        y_train = y[:len(X_train)]
+        y_test  = y[len(X_train):]
+        z_train = z[:len(X_train)]
+        z_test  = z[len(X_train):]
+        labels_train = labels[:len(X_train)]
+        labels_test  = labels[len(X_train):]
 
-    
     # Instantiate a RandomForestClassifier with 100 trees, then fit it to the training data
-    clf = RandomForestClassifier(n_estimators = RandomForest_no_estimators, random_state=137)
+    if no_estimators_ is not None:
+        RandomForest_no_estimators = no_estimators_
+    clf = RandomForestClassifier(n_estimators = RandomForest_no_estimators, random_state=137, max_depth = max_depth_, min_samples_leaf = min_samples_leaf_, min_samples_split = min_samples_split_)
     clf.fit(X_train, y_train)
     # Generate the predictions, then print test set accuracy and precision
     y_pred = clf.predict(X_test)
@@ -229,10 +245,11 @@ def backtest(shuffle_train_test = True, test_size = 0.2, features_list = []):
     bktst['Year']        = [int(x[:4]) for x in bktst['Quarter']]
     bktst['Q']           = [x[-2:] for x in bktst['Quarter']]
     bktst['Ticker']      = [x[7:] for x in bktst['label']]
+    bktst['Y_PRED']      = y_pred
+
     bktst.index          = bktst['date']
     bktst.pop('date')
     bktst = bktst.sort_values(by = 'date')
-    bktst['Y_PRED']      = y_pred
     
     # Calculate the value of capital at the end of the period when:
     # Your initial capital is X USD
@@ -253,53 +270,59 @@ def backtest(shuffle_train_test = True, test_size = 0.2, features_list = []):
     tax_rate = Backtest_tax_rate 
     unq_qrts = np.unique(bktst['Quarter'])
     for i in range(len(unq_qrts)):
+        
+        # Calculate return from fourth quarter onwards (since no sales before)
+        if i > 3:
         # Check if there are any stocks to be picked in a given quarter
-        sp500_perf = bktst[(bktst['Quarter'] == unq_qrts[i])]['SP500_YoYpc'].mean()
-        if bktst[(bktst['Quarter'] == unq_qrts[i])]['Y_PRED'].sum() > 0:
-            avg_perf_stk_pck = bktst[(bktst['Quarter'] == unq_qrts[i]) & (bktst['Y_PRED'] == True)]['Close_YoYpc'].mean()
-        else:
-            # In case of no stocks picked, buy ETF on index
-            avg_perf_stk_pck = sp500_perf
-        # Calculate tax if any positive returns generated
-        tax_model_ = 1 * (avg_perf_stk_pck > 0)
-        tax_index_ = 1 * (sp500_perf > 0)
+            sp500_perf = bktst[(bktst['Quarter'] == unq_qrts[i - 4])]['SP500_YoYpc'].mean()
+            if bktst[(bktst['Quarter'] == unq_qrts[i - 4])]['Y_PRED'].sum() > 0:
+                avg_perf_stk_pck = bktst[(bktst['Quarter'] == unq_qrts[i - 4]) & (bktst['Y_PRED'] == True)]['Close_YoYpc'].mean()
+            else:
+                # In case of no stocks picked, buy ETF on index
+                avg_perf_stk_pck = sp500_perf
+            # Calculate tax if any positive returns generated
+            tax_model_ = 1 * (avg_perf_stk_pck > 0)
+            tax_index_ = 1 * (sp500_perf > 0)
         # Calculate capital for investment based on the initial capital at 0
         # First stocks are bought, hence provision is paid
         if i == 0:
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow'] = Initial_Capital
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']    = bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow'] * (1 - prov)
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested model']   = bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested Index']   = bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value model'] = bktst.loc[bktst['Quarter'] == unq_qrts[i],'Inflow min provision']
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value index'] = bktst.loc[bktst['Quarter'] == unq_qrts[i],'Inflow min provision']
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow']                  = Initial_Capital
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']    = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow']) * (1 - prov)
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested model']   = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i],'Inflow min provision'])
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested Index']   = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i],'Inflow min provision'])
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value model'] = 0
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value index'] = 0
         # Until the end of Year 1 no shares are sold
         # Add new increment each quarter
         # Accumulate the capital in Stocks Invested columns (means used since multiple rows are within each quarter)
         elif i <= 3:
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow'] = Increment
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']    = bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow'] * (1 - prov)
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested model']   = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested model']) + bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested Index']   = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested Index']) + bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value model'] = bktst.loc[bktst['Quarter'] == unq_qrts[i],'Inflow min provision']
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow']                  = Increment
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']    = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow']) * (1 - prov)
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested model']   = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested model']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision'])
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested Index']   = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested Index']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision'])
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value model'] = 0
             bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value index'] = 0  
         # Since Year 2 onwards every quarter we sell shares / ETF on index alongside new inflows and purchases based on the model
+        # In Stock Invested, deduct first nominal capital invested before adding the value of stocks sold from the investment four quarters ago
         elif i <= 7:
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow'] = Increment
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']    = bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow'] * (1 - prov)
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow']                  = Increment
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']    = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow']) * (1 - prov)
             bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value model'] = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Inflow min provision']) * (1 + avg_perf_stk_pck * (1 - tax_rate * tax_model_)) * (1 - prov)
             bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value index'] = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Inflow min provision']) * (1 + sp500_perf * (1 - tax_rate * tax_index_)) * (1 - prov)  
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested model']   = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested model']) + bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision'] - np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Inflow min provision']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Stocks Sold value model']) * (1 - prov)
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested Index']   = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested Index']) + bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision'] - np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Inflow min provision']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Stocks Sold value index']) * (1 - prov)
+            # Portfolio(t) = Portfolio(t-1) + Inflow(t) - Capital Gain(t)
+            # Capital Gain(t) = Stocks Sold(t) - Inflow(t-4)
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested model']   = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested model']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']) - np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Inflow min provision']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value model']) * (1 - prov)
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested Index']   = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested Index']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']) - np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Inflow min provision']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value index']) * (1 - prov)
         # Since Year 3 we have the capital with accrued capital gains, which are reinvested
         else:
             bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow']                  = Increment
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']    =  bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow'] * (1 - prov)
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']    = np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow']) * (1 - prov)
             bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value model'] = (np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Stocks Sold value model']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Inflow min provision']) ) * (1 + avg_perf_stk_pck * (1 - tax_rate * tax_model_)) * (1 - prov)
             bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value index'] = (np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Stocks Sold value index']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Inflow min provision']) ) * (1 + sp500_perf       * (1 - tax_rate * tax_index_)) * (1 - prov)  
             # Deduct a sum of capital invested (model or index) before adding capital plus returns accumulated
             deduct_cap_inv = bktst[(bktst['Q'] == unq_qrts[i][-2:]) & (bktst['Year'] < int(unq_qrts[i][:4]))].groupby('Quarter')[['Inflow min provision']].mean().sum()[0]
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested model']   =  np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested model']) + bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision'] - deduct_cap_inv + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Stocks Sold value model']) * (1 - prov)
-            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested Index']   =  np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested Index']) + bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision'] - deduct_cap_inv + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 4], 'Stocks Sold value index']) * (1 - prov)
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested model']   =  np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested model']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']) - deduct_cap_inv + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value model']) * (1 - prov)
+            bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Invested Index']   =  np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i - 1], 'Stocks Invested Index']) + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Inflow min provision']) - deduct_cap_inv + np.mean(bktst.loc[bktst['Quarter'] == unq_qrts[i], 'Stocks Sold value index']) * (1 - prov)
 
     stock_returns         = 1 + z_test[y_pred, 0] 
     market_returns        = 1 + z_test[y_pred, 1] 
@@ -308,11 +331,30 @@ def backtest(shuffle_train_test = True, test_size = 0.2, features_list = []):
     print('Average model return: ', np.mean(stock_returns) - 1)
     print('Average index return: ', np.mean(market_returns) - 1)
     # Print out selected companies for trade per quarter
+    stocks_picked = pd.DataFrame(columns = ['Date', 'Tickers', 'Stock returns', 'Index returns'])
+    tickers_picked = []
+    stock_returns  = []
+    index_returns  = []
     for i in range(len(unq_qrts)):
         print(unq_qrts[i])
         print('Tickers')
         print(bktst[(bktst['Quarter'] == unq_qrts[i]) & (bktst['Y_PRED'] == 1)]['Ticker'].tolist())
-    
+        print('Average future return from the picked stocks:')
+        sp500_perf = bktst[(bktst['Quarter'] == unq_qrts[i])]['SP500_YoYpc'].mean()
+        if bktst[(bktst['Quarter'] == unq_qrts[i])]['Y_PRED'].sum() > 0:
+            avg_perf_stk_pck = bktst[(bktst['Quarter'] == unq_qrts[i]) & (bktst['Y_PRED'] == True)]['Close_YoYpc'].mean()
+        else:
+            # In case of no stocks picked, buy ETF on index
+            avg_perf_stk_pck = sp500_perf            
+        print(avg_perf_stk_pck)
+        tickers_picked.append(bktst[(bktst['Quarter'] == unq_qrts[i]) & (bktst['Y_PRED'] == 1)]['Ticker'].tolist())
+        stock_returns.append(avg_perf_stk_pck)
+        index_returns.append(sp500_perf)
+    stocks_picked['Date']    = np.unique(unq_qrts).tolist()
+    stocks_picked['Tickers'] = tickers_picked
+    stocks_picked['Stock returns']    = stock_returns
+    stocks_picked['Index returns'] = index_returns
+
     # Calculate the average growth for each stock we predicted 'buy' and the corresponding index growth
     capital_invested           = bktst.groupby('Quarter')[['Inflow']].agg('last').sum()[0]
     no_years                   = (bktst['Year'][-1] - bktst['Year'][0] + (int(bktst['Q'][-1][1]) - int(bktst['Q'][0][1])) / 4 - 1)
@@ -329,9 +371,35 @@ def backtest(shuffle_train_test = True, test_size = 0.2, features_list = []):
     print(f"Compared to the index, our strategy earns {total_outperformance: .1f} percentage points more")
 
     bktst.groupby('Quarter')[['Stocks Invested model', 'Stocks Invested Index']].agg('last').plot()
+    
+    return roc_auc, total_outperformance, stocks_picked
 
 if __name__ == "__main__":
     # Based on initial optimization routine
-    backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'cashonhand_YoYpc', 'grossmargin', 'Price/Book', 'Revenue Per Share', 'currentratio', 'cashonhand', 'totalliabilities', 'bookvaluepershare'])
+    #backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'cashonhand_YoYpc', 'grossmargin', 'Price/Book', 'Revenue Per Share', 'currentratio', 'cashonhand', 'totalliabilities', 'bookvaluepershare'])
     # Based on revised data and scripts
-    backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'Price/Book', 'Revenue Per Share', 'currentratio','cashonhand', 'bookvaluepershare', 'totalliabilities', 'Market Cap'])
+    print("NO CHANGES")
+    roc_auc_0, total_outperformance_0, stocks_picked_0 = backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'Price/Book', 'Revenue Per Share', 'currentratio','cashonhand', 'bookvaluepershare', 'totalliabilities', 'Market Cap'])
+    # print("Max depth = 3")
+    # roc_auc_1, total_outperformance_1, stocks_picked_1 = backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'Price/Book', 'Revenue Per Share', 'currentratio','cashonhand', 'bookvaluepershare', 'totalliabilities', 'Market Cap'], max_depth_ = 3)    
+    # print("Max depth = 6")
+    # roc_auc_2, total_outperformance_2, stocks_picked_2 = backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'Price/Book', 'Revenue Per Share', 'currentratio','cashonhand', 'bookvaluepershare', 'totalliabilities', 'Market Cap'], max_depth_ = 6)
+    # print("No estimators = 25")
+    # roc_auc_3, total_outperformance_3, stocks_picked_3 = backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'Price/Book', 'Revenue Per Share', 'currentratio','cashonhand', 'bookvaluepershare', 'totalliabilities', 'Market Cap'], no_estimators_ = 25)
+    # print("Max depth = 4")
+    # roc_auc_4, total_outperformance_4, stocks_picked_4 = backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'Price/Book', 'Revenue Per Share', 'currentratio','cashonhand', 'bookvaluepershare', 'totalliabilities', 'Market Cap'], max_depth_ = 4)
+    # print('Min sample per leaf = 1%')
+    # roc_auc_5, total_outperformance_5, stocks_picked_5 = backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'Price/Book', 'Revenue Per Share', 'currentratio','cashonhand', 'bookvaluepershare', 'totalliabilities', 'Market Cap'], min_samples_leaf_ = 0.01)
+    # print("Max depth = 5 plus intuitive features")
+    # roc_auc_6, total_outperformance_6, stocks_picked_6 = backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'Price/Book', 'revenue_YoYpc', 'currentratio','cashonhand', 'bookvaluepershare', 'grossmargin', 'netprofitmargin' ,'Market Cap', 'roereturnonequity', 'Enterprise Value/EBITDA', 'Price/Sales'], max_depth_ = 5)
+    # print("intuitive features")
+    # roc_auc_7, total_outperformance_7, stocks_picked_7 = backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'Price/Book', 'revenue_YoYpc', 'currentratio','cashonhand', 'bookvaluepershare', 'grossmargin', 'netprofitmargin' ,'Market Cap', 'roereturnonequity', 'Enterprise Value/EBITDA', 'Price/Sales'])
+    print("Features like run0, tested based on sorted sample")
+    roc_auc_8, total_outperformance_8, stocks_picked_8 = backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'Price/Book', 'Revenue Per Share', 'currentratio','cashonhand', 'bookvaluepershare', 'totalliabilities', 'Market Cap'], backtest_type = 'sorted')
+    print("Features like run0, tested based on sorted sample, max depth = 4, min samples split = 5, min samples leaf = 2 ")
+    roc_auc_9, total_outperformance_9, stocks_picked_9 = backtest(shuffle_train_test = True, test_size = 0.2, features_list = ['debtequityratio', 'Price/Book', 'Revenue Per Share', 'currentratio','cashonhand', 'bookvaluepershare', 'totalliabilities', 'Market Cap'], backtest_type = 'sorted', max_depth_ = 5, min_samples_leaf_ = 2, min_samples_split_ = 5)
+    print("Train sample = 70%, Features like run0, tested based on sorted sample, max depth = 4, min samples split = 5, min samples leaf = 2 ")
+    roc_auc_10, total_outperformance_10, stocks_picked_10 = backtest(shuffle_train_test = True, test_size = 0.3, features_list = ['debtequityratio', 'Price/Book', 'Revenue Per Share', 'currentratio','cashonhand', 'bookvaluepershare', 'totalliabilities', 'Market Cap'], backtest_type = 'sorted', max_depth_ = 5, min_samples_leaf_ = 2, min_samples_split_ = 5)
+        
+    
+    

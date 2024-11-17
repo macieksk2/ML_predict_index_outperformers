@@ -38,7 +38,7 @@ from sklearn.tree import export_graphviz
 os.environ["PATH"] += os.pathsep + 'C:/Program Files/Graphviz/bin'
 from utils import status_calc
 
-def backtest(shuffle_train_test = True, test_size = 0.2, topNfeat = 12, minNfeat = 6):
+def backtest(shuffle_train_test = True, test_size = 0.2, topNfeat = 15, minNfeat = 6):
     """
     A backtest, which splits the dataset into a train set and test set,
     then fits a Random Forest classifier to the train set. 
@@ -88,15 +88,21 @@ def backtest(shuffle_train_test = True, test_size = 0.2, topNfeat = 12, minNfeat
     # Stored to track returns
     z = np.array(data_df[["Close_YoYpc", "SP500_YoYpc"]])
 
-    # Generate the train set and test set by randomly splitting the dataset
-    # Random state set the same to model init to get reproducible results
-    labels = data_df['Quarter'] + "_" + data_df['Ticker']
-    X_train, X_test, y_train, y_test, z_train, z_test, labels_train, labels_test = train_test_split(
-        X, y, z, labels, test_size = test_size, shuffle = shuffle_train_test, random_state=137
-    )
-    
+    # Generate the train set and test set by splitting the dataset according to date - first 1 - test_size portion goes to training, the latest
+    # quarters fall into testing set
+    labels = data_df['Quarter'] + "_" + data_df['Ticker']    
+    train_quarters = np.unique(data_df['Quarter'])[:int((1 - test_size) * len(np.unique(data_df['Quarter'])))].tolist()
+    test_quarters  = np.unique(data_df['Quarter'])[ int((1 - test_size) * len(np.unique(data_df['Quarter']))):].tolist()
+    X_train = data_df[data_df['Quarter'].isin(train_quarters)][features].values
+    X_test  = data_df[data_df['Quarter'].isin(test_quarters)][features].values
+    y_train = y[:len(X_train)]
+    y_test  = y[len(X_train):]
+    z_train = z[:len(X_train)]
+    z_test  = z[len(X_train):]
+    labels_train = labels[:len(X_train)]
+    labels_test  = labels[len(X_train):]
     # Instantiate a RandomForestClassifier with 100 trees, then fit it to the training data
-    clf = RandomForestClassifier(n_estimators = RandomForest_no_estimators, random_state=137)
+    clf = RandomForestClassifier(n_estimators = RandomForest_no_estimators, random_state=137, max_depth = 5, min_samples_leaf = 2, min_samples_split = 5)
     clf.fit(X_train, y_train)
     # Generate the predictions, then print test set accuracy and precision
     y_pred = clf.predict(X_test)
@@ -164,12 +170,14 @@ def backtest(shuffle_train_test = True, test_size = 0.2, topNfeat = 12, minNfeat
     
         # Generate the train set and test set by randomly splitting the dataset
         # Random state set the same to model init to get reproducible results
-        X_train, X_test, y_train, y_test, z_train, z_test, labels_train, labels_test = train_test_split(
-            X, y, z, labels, test_size = test_size, shuffle = shuffle_train_test, random_state = 137
-        )
+        # Generate the train set and test set by splitting the dataset according to date - first 1 - test_size portion goes to training, the latest
+        # quarters fall into testing set
+        X_train = data_df[data_df['Quarter'].isin(train_quarters)][new_features].values
+        X_test  = data_df[data_df['Quarter'].isin(test_quarters)][new_features].values
+        
         
         # Instantiate a RandomForestClassifier with 100 trees, then fit it to the training data
-        clf = RandomForestClassifier(n_estimators = RandomForest_no_estimators, random_state = 137)
+        clf = RandomForestClassifier(n_estimators = RandomForest_no_estimators, random_state = 137, max_depth = 5, min_samples_leaf = 2, min_samples_split = 5)
         clf.fit(X_train, y_train)
         # Generate the predictions, then print test set accuracy and precision
         y_pred = clf.predict(X_test)

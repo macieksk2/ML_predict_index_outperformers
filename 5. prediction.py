@@ -62,7 +62,7 @@ def predict_stocks(datafile_name, quarters, features_list = [], is_past = False)
     
     X_train, y_train = build_data_set(features_list)
     # Remove the random_state parameter to generate actual predictions
-    clf = RandomForestClassifier(n_estimators=100, random_state=137)
+    clf = RandomForestClassifier(n_estimators=100, random_state=137, max_depth = 5, min_samples_leaf = 2, min_samples_split = 5)
     clf.fit(X_train, y_train)
 
     # Now we get the actual data from which we want to generate predictions.
@@ -114,9 +114,9 @@ if __name__ == "__main__":
     print("Building dataset and predicting stocks...")
     # Selection in last in-sample quarter, calculate average return in the following 12 months against index
     predict_stocks(datafile_name = "OUTPUT/keystats_NEW.csv", 
-                   features_list = ['debtequityratio', 'cashonhand_YoYpc', 'grossmargin', 'Price/Book', 'Revenue Per Share', 
+                    features_list = ['debtequityratio', 'cashonhand_YoYpc', 'grossmargin', 'Price/Book', 'Revenue Per Share', 
                                     'currentratio', 'cashonhand', 'totalliabilities', 'bookvaluepershare'], 
-                   quarters = ['2023Q3'], is_past = True)
+                    quarters = ['2023Q3'], is_past = True)
     # Selection in the upcoming four quarters, where no forward return has been calculated
     predict_stocks("OUTPUT/keystats_NEW_OOS.csv", 
                    features_list = ['debtequityratio', 'cashonhand_YoYpc', 'grossmargin', 'Price/Book', 'Revenue Per Share', 

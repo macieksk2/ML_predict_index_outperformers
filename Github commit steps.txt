@@ -1,0 +1,8 @@
+cd C:/Users/macie/GIT/ML_stock_predict
+git init 
+git add .
+git commit -. "COMMENT"
+git remote -v
+git push origin HEAD:master
+OR
+git push-f origin HEAD:master
