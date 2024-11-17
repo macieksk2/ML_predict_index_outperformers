@@ -35,7 +35,7 @@ Scripts are used to fit a ML (Random Forest) model predicting based on current f
 
 # SCRIPTS
 
-I data scrapping.py
+### I data scrapping.py
 
 1. Scrap macrotrends.com (Income Statement, Balance Sheet, Cash Flow statement, Key ratios)
 2. Store historicals relevant for fundamental analysis: 
@@ -53,22 +53,22 @@ I data scrapping.py
 5. Scrap historical SP500 prices from Yahoo Finance
 
 
-II data processing.py
-# ! IMPORTANT A list of features to be selected is currently coded in the script (a full set of variables led to significantly lower performance)
+### II data processing.py
+### ! IMPORTANT A list of features to be selected is currently coded in the script (a full set of variables led to significantly lower performance)
 1. QoQ, YoYpc transform
 2. Define YoY returns
 3. Create feature variables
 4. Calculate MA of prices
 5. Split in-sample piece of data (with available future 12m return) and out-of-sample part; store in csvs
 
-III optimal features.py
+ ### III optimal features.py
 
 1. Start with all features selected in script 2.
 2. Fit Random Forest, test on the training set, calculate feature importance
 3. Reduce iteratively the feature set with the least important feature, recalibrate the model, check ROC
 4. Pick the best set of features to be utilized in the following 4. backtesting.py script
 
-IV backtesting.py
+### IV backtesting.py
 
 1. Split train/test sets, either randomly or chronologically
 2. Fit RF algorithm based on selected features in prev script
@@ -76,7 +76,7 @@ IV backtesting.py
 4. Print out select stocks in each quarter
 5. Run full backtesting of a portfolio run according to the model vs a simple strategy of buying index ETF
 
-V prediction.py
+### V prediction.py
 
 1. Create first training dataset
 2. Based on model calibration, select stocks in the latest quarters
