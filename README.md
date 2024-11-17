@@ -6,28 +6,32 @@ Scripts are used to fit a ML (Random Forest) model predicting based on current f
 2. Anaconda / Spyder with packages listed in requirements.txt
 
 # INPUT
-- Hyperparamters in JSON file:
-      "url": "https://www.macrotrends.net/",
-      "tickers_filename": "tickers.csv",
-      "do_macro_scrap": "False",
-      "database": "sp500_20241023_freqQ",
-      "do_sql": "True",
-      "user": "postgres",
-      "password": "passwrod",
-      "host": "localhost",
-      "port": "5432",
-      "YF_START_DATE": "2003-01-01",
-      "YF_END_DATE": "2024-10-31",
-      "train_END_DATE": "2023-09-30",
-      "outperform_idx": 0.1,
-      "RandomForest_no_estimators": 100,
-      "Backtest_initial_capital": 10000,
-      "Backtest_increment": 3000,
-      "Backtest_provision": 0.0025,
+- Hyperparamters in JSON file:</br>
+      "url": "https://www.macrotrends.net/" </br>
+      "tickers_filename": "tickers.csv" </br>
+      "do_macro_scrap": "False" </br>
+      "database": "sp500_20241023_freqQ" </br>
+      "do_sql": "True" </br>
+      "user": "postgres" </br>
+      "password": "password" </br>
+      "host": "localhost" </br>
+      "port": "5432" </br>
+      "YF_START_DATE": "2003-01-01" </br>
+      "YF_END_DATE": "2024-10-31" </br>
+      "train_END_DATE": "2023-09-30" </br>
+      "outperform_idx": 0.1 </br>
+      "RandomForest_no_estimators": 100 </br>
+      "Backtest_initial_capital": 10000 </br>
+      "Backtest_increment": 3000 </br>
+      "Backtest_provision": 0.0025 </br>
       "Backtest_tax_rate": 0.19
+- A list of tickers for macrotrends and Yahoo Finance (separate list since not each ticker is useful for scrapping)
 
 # OUTPUT
-
+- A database of scrapped financials and prices
+- Key statistics (predefined set of variables) for X and Y sets
+- Backtesting of the portofolio on the testing set
+- Selection of stocks out of sample
 
 # SCRIPTS
 
@@ -42,35 +46,15 @@ I data scrapping.py
     - Depr/Amort
     - FCF
     - P/E, P/B, P/S, 
-    - Casf Flow Statement
-    -       "url": "https://www.macrotrends.net/",
-      "tickers_filename": "tickers.csv",
-      "do_macro_scrap": "False",
-      "database": "sp500_20241023_freqQ",
-      "do_sql": "True",
-      "user": "postgres",
-      "password": "passwrod",
-      "host": "localhost",
-      "port": "5432",
-      "YF_START_DATE": "2003-01-01",
-      "YF_END_DATE": "2024-10-31",
-      "train_END_DATE": "2023-09-30",
-      "outperform_idx": 0.1,
-      "RandomForest_no_estimators": 100,
-      "Backtest_initial_capital": 10000,
-      "Backtest_increment": 3000,
-      "Backtest_provision": 0.0025,
-      "Backtest_tax_rate": 0.19Debt, D/E
-    - No shares outstanding
-    - Dividends
-    - RoE, RoA
+    - Cash Flow Statement
+      
 3. Visualize historicals
 4. Scrap historical stock prices from Yahoo Finance
 5. Scrap historical SP500 prices from Yahoo Finance
 
 
 II data processing.py
-
+# ! IMPORTANT A list of features to be selected is currently coded in the script (a full set of variables led to significantly lower performance)
 1. QoQ, YoYpc transform
 2. Define YoY returns
 3. Create feature variables
@@ -86,7 +70,7 @@ III optimal features.py
 
 IV backtesting.py
 
-1. Split train/test sets
+1. Split train/test sets, either randomly or chronologically
 2. Fit RF algorithm based on selected features in prev script
 3. Calculate Accuracy/Precision, confusion matrix, ROC/AUC curve
 4. Print out select stocks in each quarter
